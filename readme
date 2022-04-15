@@ -1,0 +1,102 @@
+shell has many parts
+Most important part of a linux shell is the CLI(command line INterpreter).
+This part is responsible for reading and parsing user commands then executing the parsed commands
+
+Parser scans input and breaks it down to tokens.
+Token consist of one or more characters and represents a single unit of input
+
+The parser takes these token and group them together to create AST(Abstract Syntax Tree) .AST is high level representation of the commnand line given to shell.
+
+Then parser take the AST and passed it to executor which read AST and executes the parsed command
+
+Another part of shell - USER INTERFACE --which usually operates when the shell is in interactive mode.(e.g when you enter commands at the shell prompt) Here shell run a loop called REPL(Read Eval Print Loop)
+
+Most shell uses symbol table - which the shell uses to store information about variables
+
+builtin utilities - A shell can also contain builtin utilities which are a special set of commands e.g. cd,fg,bg
+
+
+The first thing i did is to create a REPL Loop
+
+1.we first print the shell prompt - print_prompt1()
+ there are five different type of prompt string -PS0 , PS1 , PS2 , PS3 , PS4 .
+
+ PS0 is only used by - bash
+
+ ++++print_prompt1++++++
+
+ The first function prints the first prompt string, or PS1, which you usually see when the shell is waiting for you to enter a command.
+ The second function prints the second prompt string, or PS2, which is printed by the shell when you enter a multi-line command
+
+2.then we read a command  ===>  read_cmd()
+
+Here we read input from stdin in 1024-byte chunks and store the input in a buffer.
+
+The first time we read input we create our buffer using malloc()
+For subsequent chunks, we extend the buffer using realloc()
+if we encounter any memory issues here we print an error message and reuturn NULL.
+if everthing goes well we copy the chunk of input we just read from user from our buffer and execute command
+
+A simple command consist of list of words separated by whitespace characters . The first word is the command name and is mandatory and second and subsequent words are optional . for example
+===> ls -l consist of two word ls(command name) -l(first argument)
+
+=>to be able to execute simple commands, shell need to perform the following steps.
+! Scan input, one character at a time to find the next token .this is called lexical scanning - the part of shell that performs this task is called scanner.
+! Extract input token (this is known as tokenizing input)
+! Parse the tokens and create an AST. parser is responsible for this
+! Execute the AST. this is the job of the executer
+
+
+
+Scanning Input:-
+
+In need to scan our input one character at a time so that we can identify the characters that can be part of the token and those that are delimiter characters(A delimiter character is one that marks the end od a token they ususlly are whitespace characters)
+
+In scanning we should be able to
+! Retrieve the next character from input.
+! Return the last character we've read back to input
+! Lookahead to check the next character without acutally Retrieving it
+! Skip over whitespace character
+
+
+To make the scanner's job easy we'll abstract our input by passing the inupt string as part of a struct source_s struture which is defined in the source file source.h
+
+++++++++++++source.h
+=>struct source_s contain a pointer to the input string along with two long variable which hold information about the string's length and current position
+
++++++++++++source.c
+=>unget_char() function returns the last character we've Retrieved from input back to input source. it does this by simply manipulating the source structure's pointers
+=>next_char() function returns the next character of input and updates the source pointer
+=>peek_char() function returns the next character of input but does not update the source pointer
+=>skip_white_spaces() function skips all whitespace characters.
+
+
+tokenizing INPut
+
++++++++++scanner.h
+=>struct token_s contain a pointer to the struct source_s that holds our input
+the structure also contain a pointer to the token's text and a field that tell us the length of the text
+=>tokenize() function it retrieve the next token from input tokens
+
+++++++++Scanner.c
+tok_buf is a pointer to the buffer in which we'll store the current token.
+tok_bufsize is the number of bytes we allocate to the buffer.
+tok_bufindex is the current buffer index (i.e. it tells us where to add the next input character in the buffer).
+eof_token is a special token we'll use to signal the end of file/input (EOF).
+
+=> add_to_buf() function adds a single character to the token buffer. If the buffer is full, the function takes care of extending it.
+
+=> create_token() function takes a string and converts it to a struct token_s structure. It takes care of allocating memory for the token's structure and text, and fills in the structure's member fields.
+
+=> free_token() function frees the memory used by a token structure, as well as the memory used to store the token's text.
+
+=>tokenize() function is our main function of our lexical scanner
+It start by allocating memory for our token buffer
+Then initializes our token buffer and source pointers
+then it calls next_char() to retriebe the next input character
+when we reach end of input tokenize() return the special eof_token
+the function then loops to read input character one at a time
+If it enconter a whitespace it checks the token buffer to see if it's empty or not if buffer is not empty we delimit the current toekn and break out of the loop. otherwise we skip the whitespace character and move along to the beginning of the next token
+
+=>create token() after we got our token tokenize() calls create_token() passing it the token text(which is stored in buffer) the token text is converted to token structer
+
